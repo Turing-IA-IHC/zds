@@ -172,3 +172,4 @@ cython_debug/
 assets/*
 inputs/*
 outputs/*
+zds_NoSubir.ipynb

@@ -100,6 +100,10 @@ def audio_save(audio_chunks, output_file, verbose=False):
 		audio = sum(audio_chunks)
 	else:
 		audio = audio_chunks
+
+	# Si la ruta del archivo (hasta el ultimo direcotrio) no existe, se crea
+	if not os.path.exists(os.path.dirname(output_file)):
+		os.makedirs(os.path.dirname(output_file))
 	# Guardar el archivo de audio
 	audio.export(output_file)
 	if verbose:
@@ -175,7 +179,105 @@ def audio_overlay(audio, background, audio_volume=0, background_volume=-20,
 	if fade_out is not None:
 		final_audio = final_audio.fade_out(fade_out)
 	return final_audio
+# Función para cargar un audio desde un archivo
+def audio_load(file_path, verbose=False):
+	"""
+	Carga un archivo de audio y lo convierte en un objeto AudioSegment.
 
+	Parámetros:
+		file_path (str): Ruta del archivo de audio.
+		verbose (bool): Si se desea mostrar mensajes de información.
+
+	Retorna:
+		AudioSegment: Objeto AudioSegment con el audio cargado.
+	"""
+	if not os.path.exists(file_path):
+		raise FileNotFoundError(f"El archivo '{file_path}' no existe.")
+	audio = AudioSegment.from_file(file_path)
+	if verbose:
+		print(f"Se ha cargado el archivo de audio '{file_path}'")
+	return audio
+
+# Función para cambiar el volumen de un archivo de audio
+def audio_volume_change(audio, audio_volume=10, new_file_path=None, verbose=False):
+	"""
+	Cambia el volumen de un archivo de audio.
+
+	Parámetros:
+		audio (AudioSegment): Audio al que se le cambiará el volumen.
+		audio_volume (int): Reducción o aumento de volumen (por defect + 10 dB).
+		new_file_path (str): Ruta del archivo de salida. Si no se especifica, no se guarda.
+		verbose (bool): Si se desea mostrar mensajes de información.
+
+	Retorna:
+		AudioSegment: Audio con el volumen cambiado.
+		str: Ruta del archivo de salida.
+	"""
+	audio = audio + audio_volume
+	if new_file_path is not None:
+		audio.export(new_file_path)
+		if verbose:
+			print(f"Se ha guardado el archivo de audio en '{new_file_path}'")
+	return audio, new_file_path
+
+# Función para unir una lista de audios
+def audio_join(audio_list, new_file_path=None, verbose=False):
+	"""
+	Concatena una lista de audios.
+
+	Parámetros:
+		audio_list (list): Lista de AudioSegment.
+		new_file_path (str): Ruta del archivo de salida.
+		verbose (bool): Si se desea mostrar mensajes de información.
+
+	Retorna:
+		AudioSegment: Audio compilado.
+		str: Ruta del archivo de salida.
+	"""
+	
+	audio = sum(audio_list)
+	if new_file_path is not None:
+		audio.export(new_file_path)
+		if verbose:
+			print(f"Se ha guardado el archivo de audio en '{new_file_path}'")
+	return audio, new_file_path
+
+# Función para remover el silencio de un audio adelante y atrás
+def audio_trim(audio, min_silence_len=1000, silence_thresh=-40, keep_silence=200, verbose=False):
+	"""
+	Recorta el silencio al principio y al final de un audio.
+
+	Parámetros:
+		audio (AudioSegment): Audio a recortar.
+		min_silence_len (int): Duración mínima del silencio en milisegundos (por defecto 1000ms).
+		silence_thresh (int): Umbral de silencio en dB (por defecto -40dB).
+		keep_silence (int): Duración del silencio a mantener al principio y al final (por defecto 200ms).
+		verbose (bool): Si se desea mostrar mensajes de información.
+
+	Retorna:
+		AudioSegment: Audio recortado.
+	"""
+	silences = silence.detect_nonsilent(audio, min_silence_len=min_silence_len, silence_thresh=silence_thresh)
+	# silences tiene una lista de la forma [[0, 239], [2196, 45177], [46590, 52342]]
+	if len(silences) == 0:
+		if verbose:
+			print(f"No se ha encontrado silencio en el audio.")
+		return audio
+	start = silences[0][1] if silences[0][0] == 0 else 0
+	end = silences[-1][0] if silences[-1][1] == len(audio) else len(audio)
+	if verbose:
+		print(f"Se recortará desde {start}ms al inicio y hasta {end}ms al final.",
+				f"de un tamaño: {len(audio)} ms")
+	start = max(0, start - keep_silence)
+	end = min(len(audio), end + keep_silence)
+	end_cut = len(audio) - end
+
+	# Recortar el audio al principio y al final
+	audio = audio[start:end]
+	if verbose:
+		print(f"Se recortó {start}ms al inicio y {end_cut}ms al final.",
+				f"Nuevo tamaño: {len(audio)} ms")
+	return audio
 
 # Función para agregar un intermedio entre 2 chunks de audio
 def chuncks_insert(chunks, position, inter, fade_in=None, fade_out=None):
